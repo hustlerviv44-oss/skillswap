@@ -1,6 +1,6 @@
 // src/Layout.jsx
-import React, { useEffect, useState } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import React, { useEffect, useState, useRef } from "react";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, db } from "./firebaseClient";
 import { doc, getDoc } from "firebase/firestore";
@@ -8,12 +8,14 @@ import { doc, getDoc } from "firebase/firestore";
 export default function Layout() {
   const [darkMode, setDarkMode] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [searchText, setSearchText] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
   const [showProfilePrompt, setShowProfilePrompt] = useState(false);
   const [userAvatar, setUserAvatar] = useState(null);
   const location = useLocation();
+  const navigate = useNavigate();
 
-  // 🌓 Theme setup
+  // 🌙 Theme setup
   useEffect(() => {
     const currentHour = new Date().getHours();
     const isNight = currentHour >= 19 || currentHour < 6;
@@ -35,24 +37,19 @@ export default function Layout() {
     }
   }, [darkMode]);
 
-  // 🧠 Listen to auth changes + handle popup + Firestore avatar
+  // 🔐 Auth + Firestore Profile
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setLoggedIn(!!u);
-
       if (u) {
         try {
-          // Load Firestore user data on login
           const docRef = doc(db, "users", u.uid);
           const docSnap = await getDoc(docRef);
-
           if (docSnap.exists()) {
             const data = docSnap.data();
             if (data.uploadedImg) setUserAvatar(data.uploadedImg);
             else if (data.avatar) setUserAvatar(data.avatar);
             else setUserAvatar(null);
-
-            // Sync to localStorage
             localStorage.setItem("userProfile", JSON.stringify(data));
           }
         } catch (err) {
@@ -76,7 +73,7 @@ export default function Layout() {
     return () => unsub();
   }, []);
 
-  // 🧩 Load avatar from localStorage and update when changed
+  // 🧩 Avatar from localStorage
   const loadAvatar = () => {
     try {
       const saved = JSON.parse(localStorage.getItem("userProfile"));
@@ -106,6 +103,16 @@ export default function Layout() {
     }
   };
 
+  // 🔍 Handle Search (redirect to browse with query)
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchText.trim()) {
+      navigate(`/browse?q=${encodeURIComponent(searchText.trim())}`);
+      setSearchText("");
+      setShowSearch(false);
+    }
+  };
+
   const tabs = [
     { name: "HOME", to: "/" },
     { name: "BROWSE SKILLS", to: "/browse" },
@@ -117,7 +124,6 @@ export default function Layout() {
   return (
     <div className="bg-gray-300 dark:bg-gray-800 font-[Poppins] min-h-screen">
       <main className="w-full min-h-screen bg-gradient-to-br from-[#F8F9FA] to-[#E9EBEF] dark:from-[#1A1B1E] dark:to-[#111216] flex flex-col p-6 md:p-12 relative overflow-x-hidden transition-all duration-500">
-        
         {/* Header */}
         <header className="flex justify-between items-center text-gray-800 dark:text-gray-200 text-[13px] md:text-[16px] font-normal tracking-[0.12em] uppercase select-none mb-8">
           {/* Logo */}
@@ -153,23 +159,16 @@ export default function Layout() {
 
           {/* Right Controls */}
           <div className="flex items-center gap-x-4 md:gap-x-6 relative">
-
-            {/* Search */}
-            <div
-              className="relative flex items-center"
-              onMouseEnter={() => setShowSearch(true)}
-              onMouseLeave={() =>
-                setTimeout(() => {
-                  if (!document.activeElement.classList.contains("search-input"))
-                    setShowSearch(false);
-                }, 120)
-              }
-            >
+            {/* 🔍 Search */}
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center">
               <button
                 aria-label="Open search"
-                onClick={() => setShowSearch((s) => !s)}
-                className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-200/40 dark:hover:bg-gray-700/40 transition-all duration-150"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowSearch((s) => !s);
+                }}
                 type="button"
+                className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-200/40 dark:hover:bg-gray-700/40 transition-all duration-150"
               >
                 <span className="material-icons-outlined text-[22px] text-gray-700 dark:text-gray-200 hover:text-blue-500 transition-colors">
                   search
@@ -178,35 +177,25 @@ export default function Layout() {
 
               <input
                 type="text"
-                placeholder="Search..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="Search skills..."
                 className={`search-input absolute right-10 top-1/2 -translate-y-1/2 text-sm rounded-full outline-none transition-all duration-300 bg-gray-100 dark:bg-[#1f1f1f] text-gray-800 dark:text-gray-200 py-2 ${
                   showSearch ? "w-44 px-3 opacity-100" : "w-0 px-0 opacity-0"
                 }`}
-                onFocus={() => setShowSearch(true)}
-                onBlur={() => setShowSearch(false)}
               />
-            </div>
+            </form>
 
             {/* Login / Logout + Avatar */}
             {loggedIn ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 relative">
                 <button
                   onClick={handleLogout}
                   className="inline-flex items-center justify-center px-6 py-2.5 rounded-full bg-gradient-to-br from-purple-200 to-blue-400 dark:from-purple-800/60 dark:to-blue-900/60 text-gray-900 dark:text-gray-200 text-[13px] font-medium shadow-md transition-transform duration-150 hover:scale-105 hover:text-white"
                 >
                   LOGOUT
                 </button>
-
-                {/* 👇 Avatar Display */}
-                {userAvatar && (
-                  <Link to="/profile">
-                    <img
-                      src={userAvatar}
-                      alt="User Avatar"
-                      className="w-10 h-10 rounded-full border border-gray-300 shadow-md hover:scale-105 transition-transform"
-                    />
-                  </Link>
-                )}
+                {userAvatar && <AvatarDropdown userAvatar={userAvatar} />}
               </div>
             ) : (
               <Link
@@ -228,7 +217,7 @@ export default function Layout() {
           </div>
         </header>
 
-        {/* ⚡ Profile Setup Prompt (below logo) */}
+        {/* Profile Prompt */}
         {showProfilePrompt && (
           <div className="fixed top-[6rem] left-[1.5rem] bg-white/90 dark:bg-[#1E1E1E]/90 backdrop-blur-lg shadow-lg rounded-lg p-4 w-[18rem] z-50 border border-gray-300 dark:border-gray-700 animate-slideInLeftSmall">
             <div className="flex justify-between items-start">
@@ -245,11 +234,9 @@ export default function Layout() {
                 ✕
               </button>
             </div>
-
             <p className="text-[13px] text-gray-600 dark:text-gray-400 mt-1 leading-snug">
               Set up your profile to connect and share skills.
             </p>
-
             <div className="flex justify-end mt-4">
               <Link
                 to="/profile"
@@ -270,6 +257,54 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+    </div>
+  );
+}
+
+// 🧩 Avatar Dropdown Component (unchanged)
+function AvatarDropdown({ userAvatar }) {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [userName, setUserName] = useState("Guest User");
+  const [credits, setCredits] = useState(0);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("userProfile"));
+      if (saved?.username) setUserName(saved.username);
+      const storedCredits = localStorage.getItem("timeCredits") || 0;
+      setCredits(storedCredits);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <img
+        src={userAvatar}
+        alt="User Avatar"
+        onClick={() => setShowDropdown((prev) => !prev)}
+        className="w-10 h-10 rounded-full border border-gray-300 shadow-md hover:scale-105 transition-transform cursor-pointer"
+      />
+      {showDropdown && (
+        <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-[#1a1a1a] rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2.5 z-[9999] animate-fadeIn">
+          <p className="text-[13px] font-medium text-gray-900 dark:text-gray-100 truncate">
+            {userName}
+          </p>
+          <p className="text-[12px] text-gray-600 dark:text-gray-400 mt-0.5">
+            ⏱ {credits} credits
+          </p>
+        </div>
+      )}
     </div>
   );
 }

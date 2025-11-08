@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./Layout";
@@ -9,6 +8,7 @@ import BrowseSkills from "./pages/BrowseSkills";
 import SkillDetail from "./pages/SkillDetail";
 import AddSkill from "./pages/AddSkill";
 import RecordLecture from "./pages/RecordLecture"; // ✅ New recording studio page
+import Messages from "./pages/Messages"; // ✅ New messages page
 import { auth, db } from "./firebaseClient";
 import {
   onAuthStateChanged,
@@ -45,69 +45,68 @@ export default function App() {
     });
   }, []);
 
+  // 🕒 Refresh credits when localStorage updates (so Navbar stays in sync)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const storedCredits = localStorage.getItem("timeCredits");
+      if (storedCredits !== null) {
+        document.dispatchEvent(new Event("creditsUpdated"));
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
   // Avoid flicker before Firebase loads
   if (user === undefined) return <div />;
 
   return (
     <Router>
       <Routes>
-        {/* 🔑 Login page — only show if not logged in */}
+        {/* 🔑 Login */}
         <Route
           path="/login"
           element={user ? <Navigate to="/" replace /> : <Login />}
         />
 
-        {/* 🌐 All main pages inside Layout */}
+        {/* 🌐 Main layout */}
         <Route element={<Layout />}>
-          {/* 🏠 Home — always visible */}
           <Route
             index
             element={<Home showProfilePrompt={user && !hasProfile} />}
           />
 
-          {/* 👤 Profile — requires login */}
           <Route
             path="profile"
             element={user ? <Profile /> : <Navigate to="/login" replace />}
           />
 
-          {/* 💬 Browse skills */}
           <Route
             path="browse"
             element={user ? <BrowseSkills /> : <Navigate to="/login" replace />}
           />
 
-          {/* 🧩 Individual Skill Page */}
           <Route
             path="skill/:id"
             element={user ? <SkillDetail /> : <Navigate to="/login" replace />}
           />
 
-          {/* 🆕 Add Skill Page */}
           <Route
             path="add-skill"
             element={user ? <AddSkill /> : <Navigate to="/login" replace />}
           />
 
-          {/* 🎥 Full-Screen Lecture Recording Page */}
           <Route
             path="record"
             element={user ? <RecordLecture /> : <Navigate to="/login" replace />}
           />
 
-          {/* 💬 Messages placeholder */}
+          {/* 💬 Updated: Messages page */}
           <Route
             path="messages"
-            element={
-              user ? (
-                <div className="p-6">Messages — (coming soon)</div>
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
+            element={user ? <Messages /> : <Navigate to="/login" replace />}
           />
 
-          {/* 🚫 Fallback route */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
