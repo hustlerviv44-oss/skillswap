@@ -49,7 +49,7 @@ export default function SkillDetail() {
     if (connecting) return;
     setConnecting(true);
     const popup = document.createElement("div");
-    popup.innerHTML = `🎉 Connection request sent to <b>${skillData.name}</b>!`;
+    popup.innerHTML = `Connection request sent to <b>${skillData.name}</b>!`;
     popup.className =
       "fixed bottom-6 right-6 px-6 py-3 rounded-xl text-white text-sm font-semibold shadow-lg backdrop-blur-md bg-gradient-to-r from-purple-500/90 to-pink-500/90 animate-fadeInOut z-[999]";
     document.body.appendChild(popup);
